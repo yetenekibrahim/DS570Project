@@ -417,8 +417,10 @@ disp=[c for c in ['callsign','origin_country','baro_altitude','velocity',
                    'altitude_velocity_ratio','flight_phase',
                    'spectral_entropy','band_energy_ratio',
                    'hybrid_score','label'] if c in df_model.columns]
-top_anom=df_model[df_model['if_pred']==-1].sort_values('hybrid_score',ascending=False).head(30)
-st.dataframe(top_anom[disp],use_container_width=True)
+df_disp = df_model.loc[:, ~df_model.columns.duplicated()].copy()
+top_anom=df_disp[df_disp['if_pred']==-1].sort_values('hybrid_score',ascending=False).head(30)
+disp_ok=[c for c in disp if c in df_disp.columns]
+st.dataframe(top_anom[disp_ok],use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # §10 PAPER SUMMARY
