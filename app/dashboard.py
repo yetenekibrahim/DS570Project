@@ -32,7 +32,6 @@ from processing.signal_processing import (
     SPECTRAL_FEATURE_NAMES,
 )
 from modeling.spectralif import SpectralIF
-from modeling.anomaly_detection import compute_shap_values
 from modeling.baseline import ZScoreDetector, run_comparison
 from modeling.evaluation import (
     full_evaluation_report, per_attack_metrics,
@@ -383,7 +382,8 @@ shap_vals,X_sub=compute_shap_values(_if_shap,_X_shap,feat_avail,max_samples=300)
 
 if shap_vals is not None:
     mean_shap=np.abs(shap_vals).mean(axis=0)
-    shap_df=pd.DataFrame({"Feature":feat_avail,"Mean |SHAP|":mean_shap}).sort_values("Mean |SHAP|",ascending=True)
+    n_feats = min(len(feat_avail), len(mean_shap))
+    shap_df=pd.DataFrame({"Feature":feat_avail[:n_feats],"Mean |SHAP|":mean_shap[:n_feats]}).sort_values("Mean |SHAP|",ascending=True)
     fig7,ax7=plt.subplots(figsize=(7,max(3,len(shap_df)*0.45)))
     ax7.barh(shap_df["Feature"],shap_df["Mean |SHAP|"],color="#8e44ad",alpha=0.85)
     ax7.set_xlabel("Mean |SHAP value|"); ax7.set_title("SHAP Feature Importance (base detector)")
