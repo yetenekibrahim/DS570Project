@@ -372,27 +372,41 @@ Positive $\phi_i$ → pushes toward **anomaly**; negative → **normal**.
 This answers the operator's question: *"Why is this flight flagged?"*
 """)
 
-# Use IF on base features for SHAP (SpectralIF's base detector)
+# Feature importance via score variance (SHAP-free proxy)
 from sklearn.ensemble import IsolationForest as _IF
 from sklearn.preprocessing import StandardScaler as _SC
-_sc_shap=_SC().fit(X_live)
-_X_shap=_sc_shap.transform(X_live)
-_if_shap=_IF(n_estimators=100,contamination=contamination,random_state=42,n_jobs=-1).fit(_X_shap)
-shap_vals,X_sub=compute_shap_values(_if_shap,_X_shap,feat_avail,max_samples=300)
 
-if shap_vals is not None:
-    mean_shap=np.abs(shap_vals).mean(axis=0)
-    n_feats = min(len(feat_avail), len(mean_shap))
-    shap_df=pd.DataFrame({"Feature":feat_avail[:n_feats],"Mean |SHAP|":mean_shap[:n_feats]}).sort_values("Mean |SHAP|",ascending=True)
-    fig7,ax7=plt.subplots(figsize=(7,max(3,len(shap_df)*0.45)))
-    ax7.barh(shap_df["Feature"],shap_df["Mean |SHAP|"],color="#8e44ad",alpha=0.85)
-    ax7.set_xlabel("Mean |SHAP value|"); ax7.set_title("SHAP Feature Importance (base detector)")
-    ax7.grid(axis="x",alpha=0.3)
-    st.pyplot(fig7); plt.close()
-    top=shap_df.iloc[-1]
-    st.info(f"📌 Most influential: **{top['Feature']}** — mean |SHAP|={top['Mean |SHAP|']:.4f}")
-else:
-    st.info("Install `shap` to enable explainability. (`pip install shap`)")
+_sc_shap = _SC().fit(X_live)
+_X_shap  = _sc_shap.transform(X_live)
+_if_shap = _IF(n_estimators=100, contamination=contamination,
+               random_state=42, n_jobs=-1).fit(_X_shap)
+
+# Permutation-based importance: how much does score change when feature is shuffled?
+base_scores = _if_shap.score_samples(_X_shap)
+importances = []
+rng_imp = np.random.RandomState(42)
+for i in range(len(feat_avail)):
+    X_perm = _X_shap.copy()
+    X_perm[:, i] = rng_imp.permutation(X_perm[:, i])
+    perm_scores = _if_shap.score_samples(X_perm)
+    importances.append(float(np.mean(np.abs(base_scores - perm_scores))))
+
+shap_df = pd.DataFrame({
+    "Feature":    feat_avail,
+    "Importance": importances,
+}).sort_values("Importance", ascending=True)
+
+fig7, ax7 = plt.subplots(figsize=(7, max(3, len(shap_df)*0.45)))
+colors = ["#e84c4c" if any(s in f for s in ["spectral","entropy","flatness","freq","energy","rolloff","centroid"])
+          else "#8e44ad" for f in shap_df["Feature"]]
+ax7.barh(shap_df["Feature"], shap_df["Importance"], color=colors, alpha=0.85)
+ax7.set_xlabel("Permutation Importance (mean |Δ score|)")
+ax7.set_title("Feature Importance — Permutation Method (proxy for SHAP)")
+ax7.grid(axis="x", alpha=0.3)
+st.pyplot(fig7); plt.close()
+top = shap_df.iloc[-1]
+st.info(f"📌 Most influential: **{top['Feature']}** — importance={top['Importance']:.4f}")
+st.caption("Permutation importance: how much the anomaly score changes when each feature is randomly shuffled.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # §9 ANOMALOUS FLIGHTS
